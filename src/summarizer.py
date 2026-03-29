@@ -5,7 +5,6 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 import anthropic
-import httpx
 
 from .database import Article
 from .logger import logger
@@ -150,7 +149,7 @@ def generate_category_digest(
         raise ValueError("ANTHROPIC_API_KEY is not set")
     client = anthropic.Anthropic(
         api_key=api_key,
-        http_client=httpx.Client(timeout=httpx.Timeout(60.0)),
+        timeout=60.0,
     )
     prompt = _build_prompt(articles, max_per_category)
 
@@ -158,11 +157,23 @@ def generate_category_digest(
 
     raw = ""
     for attempt in range(1, MAX_RETRIES + 1):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except anthropic.APIConnectionError as e:
+            logger.error(f"Anthropic connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
+            if attempt == MAX_RETRIES:
+                raise
+            continue
+        except anthropic.APIStatusError as e:
+            logger.error(f"Anthropic API status error {e.status_code} (attempt {attempt}/{MAX_RETRIES}): {e.message}")
+            if attempt == MAX_RETRIES:
+                raise
+            continue
+
         raw = "".join(b.text for b in response.content if b.type == "text")
         stop_reason = response.stop_reason
 
