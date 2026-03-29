@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event.schedule == '0 22 * * *' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'daily')
+      github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
