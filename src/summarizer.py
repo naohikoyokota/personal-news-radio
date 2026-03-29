@@ -143,37 +143,20 @@ def generate_category_digest(
     if not articles:
         return []
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} (len={len(api_key)})")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY is not set")
-    client = anthropic.Anthropic(
-        api_key=api_key,
-        timeout=60.0,
-    )
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'}")
+    client = anthropic.Anthropic(api_key=api_key)
     prompt = _build_prompt(articles, max_per_category)
 
     logger.info(f"Calling Claude for category digest ({len(articles)} articles, content preview={CONTENT_PREVIEW_LEN}chars)")
 
     raw = ""
     for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            response = client.messages.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                messages=[{"role": "user", "content": prompt}],
-            )
-        except anthropic.APIConnectionError as e:
-            logger.error(f"Anthropic connection error (attempt {attempt}/{MAX_RETRIES}): {e}")
-            if attempt == MAX_RETRIES:
-                raise
-            continue
-        except anthropic.APIStatusError as e:
-            logger.error(f"Anthropic API status error {e.status_code} (attempt {attempt}/{MAX_RETRIES}): {e.message}")
-            if attempt == MAX_RETRIES:
-                raise
-            continue
-
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            messages=[{"role": "user", "content": prompt}],
+        )
         raw = "".join(b.text for b in response.content if b.type == "text")
         stop_reason = response.stop_reason
 
