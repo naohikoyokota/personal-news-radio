@@ -88,4 +88,4 @@ claude:
 #   ja-JP-Neural2-D: 男性声（低め）
 tts_voice: "ja-JP-Neural2-B"
 # 再生速度（0.25〜4.0、通常は1.0、1.1でやや速め）
-tts_speaking_rate: 1.1
+tts_speaking_rate: 1.5
