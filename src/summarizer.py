@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 import anthropic
+import traceback
 
 from .database import Article
 from .logger import logger
@@ -144,7 +145,8 @@ def generate_category_digest(
         return []
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'}")
+    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} (len={len(api_key) if api_key else 0}, prefix={repr(api_key[:8]) if api_key else 'N/A'})")
+    logger.info(f"anthropic SDK version: {anthropic.__version__}")
     client = anthropic.Anthropic(api_key=api_key)
     prompt = _build_prompt(articles, max_per_category)
 
@@ -152,11 +154,18 @@ def generate_category_digest(
 
     raw = ""
     for attempt in range(1, MAX_RETRIES + 1):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except Exception as e:
+            logger.error(f"API call failed (attempt {attempt}/{MAX_RETRIES}): type={type(e).__name__}, msg={e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            if attempt == MAX_RETRIES:
+                raise
+            continue
         raw = "".join(b.text for b in response.content if b.type == "text")
         stop_reason = response.stop_reason
 
