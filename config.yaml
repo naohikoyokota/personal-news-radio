@@ -1,0 +1,82 @@
+# Personal News Radio 設定ファイル
+
+# 配信スケジュール (参考用)
+schedule:
+  morning: "07:00"
+  evening: "18:00"
+
+# カテゴリ別RSSフィード
+categories:
+  - id: politics
+    label: "🏛 国内政治"
+    feeds:
+      - name: "NHK政治"
+        url: "https://www3.nhk.or.jp/rss/news/cat4.xml"
+      - name: "朝日新聞"
+        url: "https://www.asahi.com/rss/asahi/newsheadlines.rdf"
+
+  - id: business
+    label: "💼 国内ビジネスニュース"
+    feeds:
+      - name: "NHK経済"
+        url: "https://www3.nhk.or.jp/rss/news/cat5.xml"
+      - name: "東洋経済オンライン"
+        url: "https://toyokeizai.net/list/feed/rss"
+
+  - id: ai
+    label: "🤖 AI動向ニュース"
+    feeds:
+      - name: "ITmedia NEWS"
+        url: "https://rss.itmedia.co.jp/rss/2.0/itmedia_news.xml"
+      - name: "TechCrunch Japan"
+        url: "https://jp.techcrunch.com/feed/"
+
+  - id: entertainment
+    label: "🎭 国内エンタメ"
+    feeds:
+      - name: "ナタリー音楽"
+        url: "https://natalie.mu/music/feed/news"
+      - name: "ナタリーアニメ"
+        url: "https://natalie.mu/comic/feed/news"
+
+  - id: sports
+    label: "⚽ 国内スポーツ"
+    feeds:
+      - name: "NHKスポーツ"
+        url: "https://www3.nhk.or.jp/rss/news/cat7.xml"
+      - name: "スポーツナビ"
+        url: "https://sports.yahoo.co.jp/rss/topfeed.rss"
+
+  - id: general
+    label: "📰 国内一般ニュース"
+    feeds:
+      - name: "NHKトップ"
+        url: "https://www3.nhk.or.jp/rss/news/cat0.xml"
+      - name: "毎日新聞"
+        url: "https://mainichi.jp/rss/etc/mainichi-flash.rss"
+
+  - id: sns
+    label: "📱 SNSトレンド"
+    feeds:
+      - name: "はてなブックマーク"
+        url: "https://b.hatena.ne.jp/hotentry.rss"
+    google_trends: true
+
+  - id: world
+    label: "🌍 海外主要ニュース"
+    feeds:
+      - name: "BBC Japan"
+        url: "https://feeds.bbci.co.uk/japanese/rss.xml"
+      - name: "Reuters日本語"
+        url: "https://jp.reuters.com/rssFeed/topNews"
+
+# 各フィードから取得する最大記事数
+max_articles_per_feed: 5
+
+# 各カテゴリから配信する最大記事数
+max_articles_per_category: 3
+
+# Claude API設定
+claude:
+  model: "claude-sonnet-4-5"
+  max_tokens: 4000
