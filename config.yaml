@@ -87,4 +87,4 @@ claude:
 #   ja-JP-Neural2-B: 落ち着いた男性声
 #   ja-JP-Neural2-C: 明瞭な男性声
 #   ja-JP-Neural2-D: 深みのある男性声
-tts_voice: "ja-JP-Neural2-F"
+tts_voice: "ja-JP-Wavenet-A"

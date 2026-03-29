@@ -9,7 +9,7 @@ import httpx
 from .logger import logger
 
 TTS_ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize"
-TTS_DEFAULT_VOICE = "ja-JP-Neural2-F"
+TTS_DEFAULT_VOICE = "ja-JP-Wavenet-A"
 # 日本語は UTF-8 で1文字=3バイト。5000バイト上限に対して余裕を持って1500文字に設定
 TTS_CHUNK_LIMIT = 1500
 
