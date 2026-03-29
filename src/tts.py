@@ -8,8 +8,9 @@ from openai import OpenAI
 from .logger import logger
 
 TTS_MODEL = "tts-1"
-TTS_VOICE = "nova"
+TTS_DEFAULT_VOICE = "alloy"
 TTS_CHUNK_LIMIT = 4000  # OpenAI TTS APIの上限は4096文字
+VALID_VOICES = {"alloy", "echo", "fable", "onyx", "shimmer"}
 
 
 def _split_script(text: str, limit: int = TTS_CHUNK_LIMIT) -> List[str]:
@@ -32,18 +33,27 @@ def _split_script(text: str, limit: int = TTS_CHUNK_LIMIT) -> List[str]:
     return chunks
 
 
-def generate_audio(script: str, output_dir: str = "~/news-radio") -> List[Path]:
+def generate_audio(
+    script: str,
+    output_dir: str = "~/news-radio",
+    voice: str = TTS_DEFAULT_VOICE,
+) -> List[Path]:
     """ラジオスクリプトをOpenAI TTSで音声化してmp3に保存する。
 
     Args:
         script: 読み上げるテキスト原稿
         output_dir: 保存先ディレクトリ（デフォルト: ~/news-radio）
+        voice: TTSの声種 (alloy/echo/fable/onyx/shimmer)
 
     Returns:
         保存したmp3ファイルのパスリスト
     """
     if not script:
         return []
+
+    if voice not in VALID_VOICES:
+        logger.warning(f"Unknown voice '{voice}', falling back to '{TTS_DEFAULT_VOICE}'")
+        voice = TTS_DEFAULT_VOICE
 
     output_path = Path(output_dir).expanduser()
     output_path.mkdir(parents=True, exist_ok=True)
@@ -55,7 +65,7 @@ def generate_audio(script: str, output_dir: str = "~/news-radio") -> List[Path]:
     chunks = _split_script(script)
     saved: List[Path] = []
 
-    logger.info(f"Generating audio: {len(chunks)} chunk(s), voice={TTS_VOICE}, output={output_path}")
+    logger.info(f"Generating audio: {len(chunks)} chunk(s), voice={voice}, output={output_path}")
 
     for i, chunk in enumerate(chunks, 1):
         if len(chunks) == 1:
@@ -67,7 +77,7 @@ def generate_audio(script: str, output_dir: str = "~/news-radio") -> List[Path]:
 
         response = client.audio.speech.create(
             model=TTS_MODEL,
-            voice=TTS_VOICE,
+            voice=voice,
             input=chunk,
         )
         response.stream_to_file(str(file_path))

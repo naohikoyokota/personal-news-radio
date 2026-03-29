@@ -109,9 +109,10 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
     # Step 8: ラジオ音声生成（--radio フラグ指定時のみ）
     if radio:
         try:
+            tts_voice = config.get("tts_voice", "alloy")
             script = generate_radio_script(digest, mode=mode.lower())
             if script:
-                audio_files = generate_audio(script)
+                audio_files = generate_audio(script, voice=tts_voice)
                 logger.info(f"ラジオ音声生成完了: {[str(f) for f in audio_files]}")
             else:
                 logger.warning("ラジオスクリプトが空のため音声生成をスキップ")
