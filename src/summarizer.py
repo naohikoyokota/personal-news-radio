@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 import anthropic
+import httpx
 
 from .database import Article
 from .logger import logger
@@ -143,7 +144,14 @@ def generate_category_digest(
     if not articles:
         return []
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} (len={len(api_key)})")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY is not set")
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        http_client=httpx.Client(timeout=httpx.Timeout(60.0)),
+    )
     prompt = _build_prompt(articles, max_per_category)
 
     logger.info(f"Calling Claude for category digest ({len(articles)} articles, content preview={CONTENT_PREVIEW_LEN}chars)")
