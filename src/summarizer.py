@@ -144,8 +144,8 @@ def generate_category_digest(
     if not articles:
         return []
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} (len={len(api_key) if api_key else 0}, prefix={repr(api_key[:8]) if api_key else 'N/A'})")
+    api_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} (len={len(api_key)}, prefix={repr(api_key[:8]) if api_key else 'N/A'})")
     logger.info(f"anthropic SDK version: {anthropic.__version__}")
     client = anthropic.Anthropic(api_key=api_key)
     prompt = _build_prompt(articles, max_per_category)
