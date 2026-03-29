@@ -104,6 +104,22 @@ def send_line_audio_message(audio_url: str, duration_ms: int = 60000, dry_run: b
         return False
 
 
+def send_line_radio_link(audio_url: str, duration_minutes: int, dry_run: bool = False) -> bool:
+    """ラジオ音声のダウンロードリンクをLINEテキストメッセージで送信する。
+
+    Args:
+        audio_url:        transfer.sh等の公開URL
+        duration_minutes: 音声の長さ（分）
+        dry_run:          Trueの場合は実際には送信しない
+    """
+    text = (
+        f"🎙 本日のニュースラジオ\n"
+        f"▶ 再生はこちら: {audio_url}\n"
+        f"⏱ 約{duration_minutes}分"
+    )
+    return send_line_message(text, dry_run=dry_run)
+
+
 def send_error_notification(error_msg: str, dry_run: bool = False) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     message = f"⚠️ PersonalNewsRadio エラー\n{timestamp}\n\n{error_msg}"
