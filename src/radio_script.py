@@ -8,7 +8,7 @@ from .summarizer import CategoryItem
 from .logger import logger
 
 SCRIPT_MODEL = "claude-sonnet-4-5"
-SCRIPT_MAX_TOKENS = 2048
+SCRIPT_MAX_TOKENS = 4096
 
 
 def generate_radio_script(digest: List[CategoryItem], mode: str = "daily") -> str:
@@ -22,9 +22,15 @@ def generate_radio_script(digest: List[CategoryItem], mode: str = "daily") -> st
     today = datetime.now().strftime("%Y年%m月%d日")
     topic_count = len(digest)
 
+    # カテゴリ一覧と記事を整理
+    categories_present = []
     topics_text = ""
     for item in digest:
+        if item.category_label not in categories_present:
+            categories_present.append(item.category_label)
         topics_text += f"【{item.category_label}】{item.title}\n{item.summary}\n\n"
+
+    categories_list = "\n".join(f"- {cat}" for cat in categories_present)
 
     prompt = f"""あなたはパーソナルニュースラジオのパーソナリティです。
 以下のニュースダイジェスト（{topic_count}件）をもとに、カジュアルで聴きやすいラジオトーク原稿を書いてください。
@@ -37,6 +43,13 @@ def generate_radio_script(digest: List[CategoryItem], mode: str = "daily") -> st
 - 原稿のみ出力（説明文・マークダウン・見出し記号不要）
 - 読み上げ用なのでURLや記号（【】など）は含めない
 - 各トピックを自然な会話の流れでつなぐ
+
+## 【重要】カテゴリ網羅ルール
+以下の{len(categories_present)}カテゴリが本日のダイジェストに含まれています。
+必ず全カテゴリを順番に紹介してください。エンタメや特定カテゴリに偏らず、
+各カテゴリから最低1記事は必ず紹介すること：
+
+{categories_list}
 
 ## ニュースダイジェスト
 {topics_text}

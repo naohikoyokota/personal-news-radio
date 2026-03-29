@@ -114,18 +114,24 @@ def generate_audio(
 
     logger.info(
         f"Generating audio via Google TTS: {len(chunks)} chunk(s), "
-        f"voice={voice}, speaking_rate={speaking_rate}, output={output_path}"
+        f"total={len(script)} chars, voice={voice}, speaking_rate={speaking_rate}, output={output_path}"
     )
 
     # 各チャンクをmp3化して連結し、1ファイルに保存
     all_bytes = b""
+    processed_chars = 0
     for i, chunk in enumerate(chunks, 1):
-        logger.info(f"Synthesizing chunk {i}/{len(chunks)} ({len(chunk)} chars)")
+        processed_chars += len(chunk)
+        logger.info(
+            f"チャンク {i}/{len(chunks)} を処理中 ({len(chunk)}文字, 累計 {processed_chars}/{len(script)}文字)"
+        )
         all_bytes += _synthesize_chunk(chunk, api_key, voice, speaking_rate)
 
     file_path = output_path / f"news_radio_{timestamp}.mp3"
     file_path.write_bytes(all_bytes)
-    logger.info(f"Audio saved: {file_path} ({len(script)} chars total)")
+    logger.info(
+        f"Audio saved: {file_path} (全{len(chunks)}チャンク処理完了, {len(script)}文字, {len(all_bytes)} bytes)"
+    )
     saved.append(file_path)
 
     return saved
