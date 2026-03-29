@@ -11,16 +11,6 @@ on:
 
   # GitHub UI または CLI から手動実行
   workflow_dispatch:
-    inputs:
-      mode:
-        description: '実行モード'
-        required: true
-        type: choice
-        options:
-          - daily
-          - weekly
-          - monthly
-        default: daily
 
 env:
   TZ: Asia/Tokyo
