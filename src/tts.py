@@ -9,7 +9,7 @@ import httpx
 from .logger import logger
 
 TTS_ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize"
-TTS_DEFAULT_VOICE = "ja-JP-Wavenet-A"
+TTS_DEFAULT_VOICE = "ja-JP-Neural2-B"
 # 日本語は UTF-8 で1文字=3バイト。5000バイト上限に対して余裕を持って1500文字に設定
 TTS_CHUNK_LIMIT = 1500
 
@@ -40,7 +40,9 @@ def _split_script(text: str, limit: int = TTS_CHUNK_LIMIT) -> List[str]:
     return chunks
 
 
-def _synthesize_chunk(text: str, api_key: str, voice_name: str) -> bytes:
+def _synthesize_chunk(
+    text: str, api_key: str, voice_name: str, speaking_rate: float = 1.0
+) -> bytes:
     """1チャンクをGoogle Cloud TTS REST APIで音声化してmp3バイト列を返す。"""
     payload = {
         "input": {"text": text},
@@ -50,6 +52,7 @@ def _synthesize_chunk(text: str, api_key: str, voice_name: str) -> bytes:
         },
         "audioConfig": {
             "audioEncoding": "MP3",
+            "speakingRate": speaking_rate,
         },
     }
 
@@ -82,13 +85,15 @@ def generate_audio(
     script: str,
     output_dir: str = "~/news-radio",
     voice: str = TTS_DEFAULT_VOICE,
+    speaking_rate: float = 1.0,
 ) -> List[Path]:
     """ラジオスクリプトをGoogle Cloud TTSで音声化してmp3に保存する。
 
     Args:
-        script:     読み上げるテキスト原稿
-        output_dir: 保存先ディレクトリ（デフォルト: ~/news-radio）
-        voice:      音声名（デフォルト: ja-JP-Neural2-F）
+        script:        読み上げるテキスト原稿
+        output_dir:    保存先ディレクトリ（デフォルト: ~/news-radio）
+        voice:         音声名（デフォルト: ja-JP-Neural2-B）
+        speaking_rate: 再生速度（0.25〜4.0、デフォルト: 1.0）
 
     Returns:
         保存したmp3ファイルのパスリスト
@@ -109,14 +114,14 @@ def generate_audio(
 
     logger.info(
         f"Generating audio via Google TTS: {len(chunks)} chunk(s), "
-        f"voice={voice}, output={output_path}"
+        f"voice={voice}, speaking_rate={speaking_rate}, output={output_path}"
     )
 
     # 各チャンクをmp3化して連結し、1ファイルに保存
     all_bytes = b""
     for i, chunk in enumerate(chunks, 1):
         logger.info(f"Synthesizing chunk {i}/{len(chunks)} ({len(chunk)} chars)")
-        all_bytes += _synthesize_chunk(chunk, api_key, voice)
+        all_bytes += _synthesize_chunk(chunk, api_key, voice, speaking_rate)
 
     file_path = output_path / f"news_radio_{timestamp}.mp3"
     file_path.write_bytes(all_bytes)

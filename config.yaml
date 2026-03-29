@@ -83,8 +83,9 @@ claude:
 
 # TTS（音声合成）設定 - Google Cloud Text-to-Speech
 # 選択可能な声（ja-JP Neural2）:
-#   ja-JP-Neural2-F: 自然な女性声（デフォルト）
-#   ja-JP-Neural2-B: 落ち着いた男性声
-#   ja-JP-Neural2-C: 明瞭な男性声
-#   ja-JP-Neural2-D: 深みのある男性声
-tts_voice: "ja-JP-Wavenet-A"
+#   ja-JP-Neural2-B: 自然な女性声（デフォルト）
+#   ja-JP-Neural2-C: 男性声
+#   ja-JP-Neural2-D: 男性声（低め）
+tts_voice: "ja-JP-Neural2-B"
+# 再生速度（0.25〜4.0、通常は1.0、1.1でやや速め）
+tts_speaking_rate: 1.1
