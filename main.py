@@ -17,6 +17,8 @@ from src.collector import collect_all_feeds
 from src.summarizer import generate_category_digest
 from src.formatter import format_summary_message, format_detail_messages
 from src.notifier import send_line_message, send_error_notification
+from src.radio_script import generate_radio_script
+from src.tts import generate_audio
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
@@ -25,7 +27,7 @@ def load_config(config_path: str = "config.yaml") -> dict:
 
 
 def run(dry_run: bool = False, config_path: str = "config.yaml",
-        weekly: bool = False, monthly: bool = False) -> int:
+        weekly: bool = False, monthly: bool = False, radio: bool = False) -> int:
     mode = "WEEKLY" if weekly else "MONTHLY" if monthly else "DAILY"
     dry_label = " [DRY RUN]" if dry_run else ""
     logger.info(f"=== Personal News Radio 起動 [{mode}]{dry_label} ===")
@@ -104,6 +106,19 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
         mark_as_delivered(article_ids)
         logger.info(f"{len(article_ids)} 件を配信済みとしてマーク")
 
+    # Step 8: ラジオ音声生成（--radio フラグ指定時のみ）
+    if radio:
+        try:
+            script = generate_radio_script(digest, mode=mode.lower())
+            if script:
+                audio_files = generate_audio(script)
+                logger.info(f"ラジオ音声生成完了: {[str(f) for f in audio_files]}")
+            else:
+                logger.warning("ラジオスクリプトが空のため音声生成をスキップ")
+        except Exception as e:
+            logger.error(f"Radio generation failed: {e}")
+            # 音声生成の失敗はLINE配信の結果に影響させない
+
     logger.info("=== Personal News Radio 完了 ===")
     return 0
 
@@ -132,6 +147,11 @@ def main():
         action="store_true",
         help="月次まとめモードで実行",
     )
+    parser.add_argument(
+        "--radio",
+        action="store_true",
+        help="ラジオ音声を生成して ~/news-radio に保存する",
+    )
     args = parser.parse_args()
 
     env_path = Path(".env")
@@ -146,6 +166,7 @@ def main():
         config_path=args.config,
         weekly=args.weekly,
         monthly=args.monthly,
+        radio=args.radio,
     )
     sys.exit(exit_code)
 
