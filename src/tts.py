@@ -137,8 +137,8 @@ def generate_audio(
     return saved
 
 
-def upload_to_transfer_sh(file_path: Path) -> Optional[str]:
-    """MP3ファイルをtransfer.shにアップロードし、公開URLを返す。
+def upload_to_file_io(file_path: Path) -> Optional[str]:
+    """MP3ファイルをfile.ioにアップロードし、公開URLを返す（14日間有効）。
 
     Args:
         file_path: アップロードするMP3ファイルのパス
@@ -146,25 +146,32 @@ def upload_to_transfer_sh(file_path: Path) -> Optional[str]:
     Returns:
         アップロード成功時は公開URL、失敗時はNone
     """
-    filename = file_path.name
-    url = f"https://transfer.sh/{filename}"
-    logger.info(f"Uploading {filename} to transfer.sh...")
+    import requests
 
+    logger.info(f"Uploading {file_path.name} to file.io...")
     try:
         with open(file_path, "rb") as f:
-            resp = httpx.put(
-                url,
-                content=f.read(),
-                headers={"Content-Type": "audio/mpeg"},
-                timeout=120.0,
+            resp = requests.post(
+                "https://file.io",
+                files={"file": f},
+                data={"expires": "14d"},
+                timeout=120,
             )
         if resp.status_code == 200:
-            public_url = resp.text.strip()
-            logger.info(f"Upload successful: {public_url}")
-            return public_url
+            public_url = resp.json().get("link")
+            if public_url:
+                logger.info(f"Upload successful: {public_url}")
+                return public_url
+            else:
+                logger.error(f"file.io response missing 'link': {resp.text[:200]}")
+                return None
         else:
-            logger.error(f"transfer.sh error {resp.status_code}: {resp.text[:200]}")
+            logger.error(f"file.io error {resp.status_code}: {resp.text[:200]}")
             return None
-    except httpx.RequestError as e:
-        logger.error(f"transfer.sh upload failed: {e}")
+    except Exception as e:
+        logger.error(f"file.io upload failed: {e}")
         return None
+
+
+# 後方互換エイリアス
+upload_to_transfer_sh = upload_to_file_io

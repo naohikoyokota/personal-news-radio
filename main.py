@@ -18,7 +18,7 @@ from src.summarizer import generate_category_digest
 from src.formatter import format_summary_message, format_detail_messages
 from src.notifier import send_line_message, send_line_audio_message, send_line_radio_link, send_error_notification
 from src.radio_script import generate_radio_script
-from src.tts import generate_audio, upload_to_transfer_sh
+from src.tts import generate_audio, upload_to_file_io
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
@@ -118,7 +118,7 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
                 # 再生時間を推定（日本語TTS: 約380文字/分 × speaking_rate）
                 duration_minutes = max(1, round(len(script) / (380 * tts_speaking_rate)))
                 for audio_file in audio_files:
-                    audio_url = upload_to_transfer_sh(audio_file)
+                    audio_url = upload_to_file_io(audio_file)
                     if audio_url:
                         send_line_radio_link(audio_url, duration_minutes, dry_run=dry_run)
                     else:
