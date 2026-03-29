@@ -45,13 +45,28 @@ def _synthesize_chunk(text: str, api_key: str, voice_name: str) -> bytes:
             "audioEncoding": "MP3",
         },
     }
+
+    # デバッグ: 送信するリクエストボディを確認（textは先頭50文字のみ表示）
+    debug_payload = {
+        "input": {"text": text[:50] + "..." if len(text) > 50 else text},
+        "voice": payload["voice"],
+        "audioConfig": payload["audioConfig"],
+    }
+    logger.info(f"Google TTS request: {debug_payload}")
+
     response = httpx.post(
         TTS_ENDPOINT,
         params={"key": api_key},
         json=payload,
         timeout=60.0,
     )
-    response.raise_for_status()
+
+    if response.status_code != 200:
+        logger.error(
+            f"Google TTS error {response.status_code}: {response.text}"
+        )
+        response.raise_for_status()
+
     audio_b64 = response.json()["audioContent"]
     return base64.b64decode(audio_b64)
 
