@@ -1,11 +1,10 @@
 import os
-import json
 import re
-from typing import List, Dict, Optional
+import traceback
+from typing import List, Optional
 from dataclasses import dataclass
 
 import anthropic
-import traceback
 
 from .database import Article
 from .logger import logger
@@ -38,116 +37,76 @@ class CategoryItem:
 
 
 CONTENT_PREVIEW_LEN = 200  # 各記事の本文をこの文字数に切り詰めてClaudeに渡す
-MAX_TOKENS = 8096
-MAX_RETRIES = 2
-# リトライ時のカテゴリあたり最大記事数（attempt 1→3件, attempt 2→2件）
-_ARTICLES_PER_CAT_BY_ATTEMPT = [3, 2]
+MAX_TOKENS = 2048           # 1カテゴリ分のテキスト出力なので2048で十分
 
 
-def _limit_articles(articles: List[Article], max_per_category: int) -> List[Article]:
-    """カテゴリごとに上位 max_per_category 件に絞り、合計記事数を抑える。"""
-    counts: Dict[str, int] = {}
-    result: List[Article] = []
-    for a in articles:
-        cat = a.category or "general"
-        if counts.get(cat, 0) < max_per_category:
-            result.append(a)
-            counts[cat] = counts.get(cat, 0) + 1
-    return result
-
-
-def _build_prompt(articles: List[Article], max_per_category: int) -> str:
-    category_defs = "\n".join(
-        f'- {c["id"]}: {c["label"]}' for c in CATEGORIES
-    )
-
+def _build_category_prompt(articles: List[Article], category_label: str, max_items: int) -> str:
     articles_text = ""
     for i, a in enumerate(articles):
         content_preview = (a.content or "")[:CONTENT_PREVIEW_LEN].replace("\n", " ")
-        articles_text += (
-            f"[{i}] ソース: {a.source} | カテゴリヒント: {a.category}\n"
-            f"タイトル: {a.title}\n"
-            f"本文: {content_preview}\n\n"
-        )
+        articles_text += f"[{i}] {a.title}\n    {content_preview}\n\n"
 
-    return f"""以下のニュース記事を分析し、8カテゴリに分類・要約してください。
+    return f"""以下の記事リストから「{category_label}」に関する記事を最大{max_items}件選んで紹介してください。
 
-カテゴリ定義:
-{category_defs}
+記事リスト：
+{articles_text}
+各記事について以下の形式で出力してください：
 
-ルール:
-- 各カテゴリから最大{max_per_category}件を選ぶ
-- 該当記事がないカテゴリはJSONに含めない
-- article_indexは記事リストの番号 [0], [1]... と対応
-- titleは簡潔な日本語タイトル（元タイトルを参考に）
-- summaryは読み物風の3〜5行の日本語要約
-- 必ず有効なJSONのみを返す（説明文・コードブロック不要）
+記事番号：[番号]
+タイトル：[簡潔な日本語タイトル]
+要約：[3〜5行の日本語要約]
 
-出力形式:
-{{
-  "categories": {{
-    "politics": [
-      {{"article_index": 0, "title": "...", "summary": "..."}}
-    ],
-    "business": [...]
-  }}
-}}
-
---- 記事リスト ---
-{articles_text}"""
+該当記事がない場合は「該当なし」とだけ出力してください。"""
 
 
-def _parse_claude_response(text: str) -> dict:
-    text = re.sub(r"```(?:json)?\s*", "", text).strip()
-    text = text.rstrip("`").strip()
-    return json.loads(text)
-
-
-def _try_partial_parse(text: str) -> dict:
-    """途切れたJSONから解析できたカテゴリだけを抽出する。"""
-    text = re.sub(r"```(?:json)?\s*", "", text).strip().rstrip("`").strip()
-
-    # "categories" オブジェクトの中身を正規表現で各カテゴリごとに抽出
-    categories: dict = {}
-    cat_ids = [c["id"] for c in CATEGORIES]
-    for cat_id in cat_ids:
-        # "cat_id": [ ... ] のブロックを探す（ネストが壊れていても1階層分は取れる）
-        pattern = rf'"{cat_id}"\s*:\s*(\[.*?\])'
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            try:
-                items = json.loads(match.group(1))
-                categories[cat_id] = items
-            except json.JSONDecodeError:
-                pass
-
-    return {"categories": categories}
-
-
-def _build_result(
-    categories_data: dict,
+def _parse_category_response(
+    text: str,
     articles: List[Article],
-    max_per_category: int,
+    category_id: str,
+    category_label: str,
 ) -> List[CategoryItem]:
+    """テキスト形式のレスポンスをパースしてCategoryItemリストを返す。"""
+    text = text.strip()
+
+    if text == "該当なし" or (len(text) < 30 and "該当なし" in text):
+        return []
+
     result: List[CategoryItem] = []
-    for cat in CATEGORIES:
-        cat_id = cat["id"]
-        cat_label = cat["label"]
-        items = categories_data.get(cat_id, [])
-        for item in items[:max_per_category]:
-            idx = item.get("article_index")
-            if idx is None or not (0 <= idx < len(articles)):
-                logger.warning(f"Invalid article_index {idx} for category {cat_id}")
-                continue
-            original = articles[idx]
-            result.append(CategoryItem(
-                category_id=cat_id,
-                category_label=cat_label,
-                title=item.get("title", original.title),
-                summary=item.get("summary", ""),
-                url=original.url,
-                article_id=original.id,
-            ))
+    # 空行区切りでブロックに分割
+    blocks = re.split(r"\n\s*\n", text)
+
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+
+        idx_match = re.search(r"記事番号[：:]\s*\[?(\d+)\]?", block)
+        title_match = re.search(r"タイトル[：:]\s*(.+)", block)
+        summary_match = re.search(r"要約[：:]\s*([\s\S]+)", block)
+
+        if not title_match:
+            continue
+
+        title = title_match.group(1).strip()
+        summary = summary_match.group(1).strip() if summary_match else ""
+
+        url = ""
+        article_id = None
+        if idx_match:
+            idx = int(idx_match.group(1))
+            if 0 <= idx < len(articles):
+                url = articles[idx].url
+                article_id = articles[idx].id
+
+        result.append(CategoryItem(
+            category_id=category_id,
+            category_label=category_label,
+            title=title,
+            summary=summary,
+            url=url,
+            article_id=article_id,
+        ))
+
     return result
 
 
@@ -159,57 +118,44 @@ def generate_category_digest(
         return []
 
     api_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
-    logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} (len={len(api_key)}, prefix={repr(api_key[:8]) if api_key else 'N/A'})")
+    logger.info(
+        f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} "
+        f"(len={len(api_key)}, prefix={repr(api_key[:8]) if api_key else 'N/A'})"
+    )
     logger.info(f"anthropic SDK version: {anthropic.__version__}")
     client = anthropic.Anthropic(api_key=api_key)
 
-    logger.info(f"Calling Claude for category digest ({len(articles)} articles total, content preview={CONTENT_PREVIEW_LEN}chars)")
+    logger.info(
+        f"Starting per-category digest: {len(articles)} articles, "
+        f"{len(CATEGORIES)} categories × 1 API call each"
+    )
 
-    raw = ""
-    for attempt in range(1, MAX_RETRIES + 1):
-        # リトライ時は記事数を減らしてプロンプトを再構築
-        articles_per_cat = _ARTICLES_PER_CAT_BY_ATTEMPT[attempt - 1]
-        limited = _limit_articles(articles, articles_per_cat)
-        prompt = _build_prompt(limited, max_per_category)
-        logger.info(f"Attempt {attempt}/{MAX_RETRIES}: {len(limited)} articles ({articles_per_cat}/category), max_tokens={MAX_TOKENS}")
+    all_results: List[CategoryItem] = []
 
+    for cat in CATEGORIES:
+        cat_id = cat["id"]
+        cat_label = cat["label"]
+        prompt = _build_category_prompt(articles, cat_label, max_per_category)
+
+        logger.info(f"Calling Claude for [{cat_label}]...")
         try:
             response = client.messages.create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
             )
+            raw = "".join(b.text for b in response.content if b.type == "text")
+            logger.info(f"[{cat_id}] stop_reason={response.stop_reason}, len={len(raw)}")
+
+            items = _parse_category_response(raw, articles, cat_id, cat_label)
+            logger.info(f"[{cat_id}] {len(items)} items parsed")
+            all_results.extend(items)
+
         except Exception as e:
-            logger.error(f"API call failed (attempt {attempt}/{MAX_RETRIES}): type={type(e).__name__}, msg={e}")
-            logger.error(f"Full traceback:\n{traceback.format_exc()}")
-            if attempt == MAX_RETRIES:
-                raise
-            continue
-        raw = "".join(b.text for b in response.content if b.type == "text")
-        stop_reason = response.stop_reason
+            logger.error(f"[{cat_id}] API call failed: {type(e).__name__}: {e}")
+            logger.error(traceback.format_exc())
+            # 1カテゴリ失敗しても他のカテゴリは継続
 
-        logger.info(f"Claude response (attempt {attempt}): stop_reason={stop_reason}, len={len(raw)}")
-
-        if stop_reason != "max_tokens":
-            break
-
-        logger.warning(f"Response truncated (max_tokens). Retrying with fewer articles... ({attempt}/{MAX_RETRIES})")
-
-    # 完全なJSONとして解析を試みる
-    try:
-        data = _parse_claude_response(raw)
-        categories_data = data.get("categories", {})
-        logger.info(f"JSON parse succeeded ({len(categories_data)} categories)")
-    except json.JSONDecodeError as e:
-        logger.warning(f"Full JSON parse failed: {e}. Attempting partial parse...")
-        partial = _try_partial_parse(raw)
-        categories_data = partial.get("categories", {})
-        if categories_data:
-            logger.info(f"Partial parse recovered {len(categories_data)} categories: {list(categories_data.keys())}")
-        else:
-            logger.error(f"Partial parse also failed. Raw response (first 500 chars):\n{raw[:500]}")
-            return []
-
-    result = _build_result(categories_data, articles, max_per_category)
-    logger.info(f"Digest generated: {len(result)} items across {len(categories_data)} categories")
-    return result
+    categories_found = len(set(r.category_id for r in all_results))
+    logger.info(f"Digest generated: {len(all_results)} items across {categories_found} categories")
+    return all_results
