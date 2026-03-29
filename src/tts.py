@@ -2,7 +2,7 @@ import base64
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import httpx
 
@@ -129,3 +129,36 @@ def generate_audio(
     saved.append(file_path)
 
     return saved
+
+
+def upload_to_transfer_sh(file_path: Path) -> Optional[str]:
+    """MP3ファイルをtransfer.shにアップロードし、公開URLを返す。
+
+    Args:
+        file_path: アップロードするMP3ファイルのパス
+
+    Returns:
+        アップロード成功時は公開URL、失敗時はNone
+    """
+    filename = file_path.name
+    url = f"https://transfer.sh/{filename}"
+    logger.info(f"Uploading {filename} to transfer.sh...")
+
+    try:
+        with open(file_path, "rb") as f:
+            resp = httpx.put(
+                url,
+                content=f.read(),
+                headers={"Content-Type": "audio/mpeg"},
+                timeout=120.0,
+            )
+        if resp.status_code == 200:
+            public_url = resp.text.strip()
+            logger.info(f"Upload successful: {public_url}")
+            return public_url
+        else:
+            logger.error(f"transfer.sh error {resp.status_code}: {resp.text[:200]}")
+            return None
+    except httpx.RequestError as e:
+        logger.error(f"transfer.sh upload failed: {e}")
+        return None

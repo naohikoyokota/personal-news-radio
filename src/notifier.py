@@ -55,6 +55,55 @@ def send_line_message(text: str, dry_run: bool = False) -> bool:
     return success
 
 
+def send_line_audio_message(audio_url: str, duration_ms: int = 60000, dry_run: bool = False) -> bool:
+    """LINE Audio Messageを送信する。
+
+    Args:
+        audio_url:   外部からアクセス可能なMP3のURL（transfer.sh等）
+        duration_ms: 音声の長さ（ミリ秒）、デフォルト60秒
+        dry_run:     Trueの場合は実際には送信しない
+    """
+    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
+    user_id = os.environ.get("LINE_USER_ID", "").strip()
+
+    if not token or not user_id:
+        logger.error("LINE_CHANNEL_ACCESS_TOKEN or LINE_USER_ID not set")
+        return False
+
+    payload = {
+        "to": user_id,
+        "messages": [
+            {
+                "type": "audio",
+                "originalContentUrl": audio_url,
+                "duration": duration_ms,
+            }
+        ],
+    }
+
+    if dry_run:
+        logger.info(f"[DRY RUN] Would send LINE audio message: {audio_url} ({duration_ms}ms)")
+        return True
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    try:
+        import json
+        logger.info(f"LINE audio request: url={audio_url}, duration={duration_ms}ms")
+        resp = httpx.post(LINE_API_URL, headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        logger.info("LINE audio message sent successfully")
+        return True
+    except httpx.HTTPStatusError as e:
+        logger.error(f"LINE API error {e.response.status_code}: {e.response.text}")
+        return False
+    except httpx.RequestError as e:
+        logger.error(f"LINE API request failed: {e}")
+        return False
+
+
 def send_error_notification(error_msg: str, dry_run: bool = False) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     message = f"⚠️ PersonalNewsRadio エラー\n{timestamp}\n\n{error_msg}"

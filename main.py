@@ -16,9 +16,9 @@ from src.database import init_db, get_undelivered_articles, mark_as_delivered
 from src.collector import collect_all_feeds
 from src.summarizer import generate_category_digest
 from src.formatter import format_summary_message, format_detail_messages
-from src.notifier import send_line_message, send_error_notification
+from src.notifier import send_line_message, send_line_audio_message, send_error_notification
 from src.radio_script import generate_radio_script
-from src.tts import generate_audio
+from src.tts import generate_audio, upload_to_transfer_sh
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
@@ -115,6 +115,12 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
             if script:
                 audio_files = generate_audio(script, voice=tts_voice, speaking_rate=tts_speaking_rate)
                 logger.info(f"ラジオ音声生成完了: {[str(f) for f in audio_files]}")
+                for audio_file in audio_files:
+                    audio_url = upload_to_transfer_sh(audio_file)
+                    if audio_url:
+                        send_line_audio_message(audio_url, dry_run=dry_run)
+                    else:
+                        logger.warning(f"transfer.shへのアップロード失敗のため音声メッセージをスキップ: {audio_file}")
             else:
                 logger.warning("ラジオスクリプトが空のため音声生成をスキップ")
         except Exception as e:
