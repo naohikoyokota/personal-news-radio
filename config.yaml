@@ -81,11 +81,10 @@ claude:
   model: "claude-sonnet-4-5"
   max_tokens: 4000
 
-# TTS（音声合成）設定
-# 選択可能な声: alloy / echo / fable / onyx / shimmer
-#   alloy  : バランスが良い（日本語に比較的自然）
-#   echo   : 落ち着いた男性声
-#   fable  : 温かみのある声
-#   onyx   : 深みのある男性声
-#   shimmer: 明るい女性声
-tts_voice: "alloy"
+# TTS（音声合成）設定 - Google Cloud Text-to-Speech
+# 選択可能な声（ja-JP Neural2）:
+#   ja-JP-Neural2-F: 自然な女性声（デフォルト）
+#   ja-JP-Neural2-B: 落ち着いた男性声
+#   ja-JP-Neural2-C: 明瞭な男性声
+#   ja-JP-Neural2-D: 深みのある男性声
+tts_voice: "ja-JP-Neural2-F"
