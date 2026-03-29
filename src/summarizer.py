@@ -38,8 +38,22 @@ class CategoryItem:
 
 
 CONTENT_PREVIEW_LEN = 200  # 各記事の本文をこの文字数に切り詰めてClaudeに渡す
-MAX_TOKENS = 4096
+MAX_TOKENS = 8096
 MAX_RETRIES = 2
+# リトライ時のカテゴリあたり最大記事数（attempt 1→3件, attempt 2→2件）
+_ARTICLES_PER_CAT_BY_ATTEMPT = [3, 2]
+
+
+def _limit_articles(articles: List[Article], max_per_category: int) -> List[Article]:
+    """カテゴリごとに上位 max_per_category 件に絞り、合計記事数を抑える。"""
+    counts: Dict[str, int] = {}
+    result: List[Article] = []
+    for a in articles:
+        cat = a.category or "general"
+        if counts.get(cat, 0) < max_per_category:
+            result.append(a)
+            counts[cat] = counts.get(cat, 0) + 1
+    return result
 
 
 def _build_prompt(articles: List[Article], max_per_category: int) -> str:
@@ -148,12 +162,17 @@ def generate_category_digest(
     logger.info(f"ANTHROPIC_API_KEY: {'set' if api_key else 'NOT SET'} (len={len(api_key)}, prefix={repr(api_key[:8]) if api_key else 'N/A'})")
     logger.info(f"anthropic SDK version: {anthropic.__version__}")
     client = anthropic.Anthropic(api_key=api_key)
-    prompt = _build_prompt(articles, max_per_category)
 
-    logger.info(f"Calling Claude for category digest ({len(articles)} articles, content preview={CONTENT_PREVIEW_LEN}chars)")
+    logger.info(f"Calling Claude for category digest ({len(articles)} articles total, content preview={CONTENT_PREVIEW_LEN}chars)")
 
     raw = ""
     for attempt in range(1, MAX_RETRIES + 1):
+        # リトライ時は記事数を減らしてプロンプトを再構築
+        articles_per_cat = _ARTICLES_PER_CAT_BY_ATTEMPT[attempt - 1]
+        limited = _limit_articles(articles, articles_per_cat)
+        prompt = _build_prompt(limited, max_per_category)
+        logger.info(f"Attempt {attempt}/{MAX_RETRIES}: {len(limited)} articles ({articles_per_cat}/category), max_tokens={MAX_TOKENS}")
+
         try:
             response = client.messages.create(
                 model=MODEL,
@@ -169,12 +188,12 @@ def generate_category_digest(
         raw = "".join(b.text for b in response.content if b.type == "text")
         stop_reason = response.stop_reason
 
-        logger.debug(f"Claude response (attempt {attempt}): stop_reason={stop_reason}, len={len(raw)}")
+        logger.info(f"Claude response (attempt {attempt}): stop_reason={stop_reason}, len={len(raw)}")
 
         if stop_reason != "max_tokens":
             break
 
-        logger.warning(f"Response truncated (max_tokens). Retrying... ({attempt}/{MAX_RETRIES})")
+        logger.warning(f"Response truncated (max_tokens). Retrying with fewer articles... ({attempt}/{MAX_RETRIES})")
 
     # 完全なJSONとして解析を試みる
     try:
