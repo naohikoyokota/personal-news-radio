@@ -10,24 +10,31 @@ from .logger import logger
 
 TTS_ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize"
 TTS_DEFAULT_VOICE = "ja-JP-Neural2-F"
-TTS_CHUNK_LIMIT = 4000  # Google Cloud TTS の上限は 5000 バイト（文字数で余裕を持って 4000）
+# 日本語は UTF-8 で1文字=3バイト。5000バイト上限に対して余裕を持って1500文字に設定
+TTS_CHUNK_LIMIT = 1500
 
 
 def _split_script(text: str, limit: int = TTS_CHUNK_LIMIT) -> List[str]:
-    """テキストを段落単位で limit 文字以内に分割する。"""
-    if len(text) <= limit:
-        return [text]
+    """テキストを文単位（。や改行）で limit 文字以内に分割する。"""
+    import re
+
+    # 句点・改行を区切りとして文に分割（区切り文字は直前のトークンに残す）
+    sentences = re.split(r"(?<=。)|(?<=\n)", text)
+    sentences = [s for s in sentences if s.strip()]
 
     chunks: List[str] = []
     current = ""
-    for paragraph in text.split("\n\n"):
-        block = paragraph + "\n\n"
-        if len(current) + len(block) <= limit:
-            current += block
+    for sentence in sentences:
+        if len(current) + len(sentence) <= limit:
+            current += sentence
         else:
             if current:
                 chunks.append(current.strip())
-            current = block
+            # 1文がlimitを超える場合は強制的にlimit文字で切る
+            while len(sentence) > limit:
+                chunks.append(sentence[:limit])
+                sentence = sentence[limit:]
+            current = sentence
     if current.strip():
         chunks.append(current.strip())
     return chunks
@@ -105,23 +112,15 @@ def generate_audio(
         f"voice={voice}, output={output_path}"
     )
 
-    if len(chunks) == 1:
-        # チャンクが1つ → そのまま1ファイルに保存
-        mp3_bytes = _synthesize_chunk(chunks[0], api_key, voice)
-        file_path = output_path / f"news_radio_{timestamp}.mp3"
-        file_path.write_bytes(mp3_bytes)
-        logger.info(f"Audio saved: {file_path} ({len(chunks[0])} chars)")
-        saved.append(file_path)
-    else:
-        # チャンクが複数 → 各チャンクをmp3化して連結してから1ファイルに保存
-        all_bytes = b""
-        for i, chunk in enumerate(chunks, 1):
-            logger.info(f"Synthesizing chunk {i}/{len(chunks)} ({len(chunk)} chars)")
-            all_bytes += _synthesize_chunk(chunk, api_key, voice)
+    # 各チャンクをmp3化して連結し、1ファイルに保存
+    all_bytes = b""
+    for i, chunk in enumerate(chunks, 1):
+        logger.info(f"Synthesizing chunk {i}/{len(chunks)} ({len(chunk)} chars)")
+        all_bytes += _synthesize_chunk(chunk, api_key, voice)
 
-        file_path = output_path / f"news_radio_{timestamp}.mp3"
-        file_path.write_bytes(all_bytes)
-        logger.info(f"Audio saved: {file_path} ({len(script)} chars total)")
-        saved.append(file_path)
+    file_path = output_path / f"news_radio_{timestamp}.mp3"
+    file_path.write_bytes(all_bytes)
+    logger.info(f"Audio saved: {file_path} ({len(script)} chars total)")
+    saved.append(file_path)
 
     return saved
