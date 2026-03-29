@@ -1,0 +1,137 @@
+name: Personal News Radio
+
+on:
+  schedule:
+    # 毎日 JST 7:00 (UTC 22:00 前日)
+    - cron: '0 22 * * *'
+    # 毎週日曜 JST 8:00 (UTC 土曜 23:00)
+    - cron: '0 23 * * 6'
+    # 毎日 JST 8:05 (UTC 23:05 前日) ← 月末チェック用
+    - cron: '5 23 * * *'
+
+  # GitHub UI または CLI から手動実行
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '実行モード'
+        required: true
+        type: choice
+        options:
+          - daily
+          - weekly
+          - monthly
+        default: daily
+
+env:
+  TZ: Asia/Tokyo
+
+# ──────────────────────────────────────────────────────────────
+# デイリー配信  毎日 JST 7:00
+# ──────────────────────────────────────────────────────────────
+jobs:
+  daily:
+    name: デイリー配信 (毎日 7:00 JST)
+    runs-on: ubuntu-latest
+    if: |
+      github.event.schedule == '0 22 * * *' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'daily')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily news
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python main.py
+
+# ──────────────────────────────────────────────────────────────
+# 週次まとめ  毎週日曜 JST 8:00
+# ──────────────────────────────────────────────────────────────
+  weekly:
+    name: 週次まとめ (毎週日曜 8:00 JST)
+    runs-on: ubuntu-latest
+    if: |
+      github.event.schedule == '0 23 * * 6' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'weekly')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run weekly summary
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python main.py --weekly
+
+# ──────────────────────────────────────────────────────────────
+# 月次まとめ  毎月最終日 JST 8:05
+# cron は毎日 UTC 23:05 で起動し、JST 月末のみ実行する
+# ──────────────────────────────────────────────────────────────
+  monthly:
+    name: 月次まとめ (毎月最終日 8:05 JST)
+    runs-on: ubuntu-latest
+    if: |
+      github.event.schedule == '5 23 * * *' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'monthly')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # UTC 23:05 = JST 翌日 8:05 → JST 日付で「今日が月末か」を判定
+      - name: Check if last day of month (JST)
+        id: check_last_day
+        run: |
+          NEXT_DAY_JST=$(TZ=Asia/Tokyo date -d tomorrow +%d)
+          TODAY_JST=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          echo "今日 (JST): $TODAY_JST"
+          if [ "$NEXT_DAY_JST" = "01" ]; then
+            echo "is_last_day=true" >> "$GITHUB_OUTPUT"
+            echo "✅ 月末を検知 → 月次まとめを実行します"
+          else
+            echo "is_last_day=false" >> "$GITHUB_OUTPUT"
+            echo "⏭️  月末ではないためスキップします"
+          fi
+
+      - name: Run monthly summary
+        if: steps.check_last_day.outputs.is_last_day == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python main.py --monthly
