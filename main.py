@@ -19,6 +19,7 @@ from src.formatter import format_summary_message, format_detail_messages
 from src.notifier import send_line_message, send_line_audio_message, send_line_radio_link, send_error_notification
 from src.radio_script import generate_radio_script
 from src.tts import generate_audio, upload_to_file_io
+from src.web_generator import generate_html_pages
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
@@ -27,7 +28,8 @@ def load_config(config_path: str = "config.yaml") -> dict:
 
 
 def run(dry_run: bool = False, config_path: str = "config.yaml",
-        weekly: bool = False, monthly: bool = False, radio: bool = False) -> int:
+        weekly: bool = False, monthly: bool = False,
+        radio: bool = False, web: bool = False) -> int:
     mode = "WEEKLY" if weekly else "MONTHLY" if monthly else "DAILY"
     dry_label = " [DRY RUN]" if dry_run else ""
     logger.info(f"=== Personal News Radio 起動 [{mode}]{dry_label} ===")
@@ -129,6 +131,15 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
             logger.error(f"Radio generation failed: {e}")
             # 音声生成の失敗はLINE配信の結果に影響させない
 
+    # Step 9: GitHub Pages用HTML生成（--web フラグ指定時のみ）
+    if web:
+        try:
+            html_files = generate_html_pages(digest)
+            logger.info(f"HTML生成完了: {[str(f) for f in html_files]}")
+        except Exception as e:
+            logger.error(f"HTML generation failed: {e}")
+            # HTML生成失敗はLINE配信結果に影響させない
+
     logger.info("=== Personal News Radio 完了 ===")
     return 0
 
@@ -162,6 +173,11 @@ def main():
         action="store_true",
         help="ラジオ音声を生成して ~/news-radio に保存する",
     )
+    parser.add_argument(
+        "--web",
+        action="store_true",
+        help="GitHub Pages用HTMLを docs/ に生成する",
+    )
     args = parser.parse_args()
 
     env_path = Path(".env")
@@ -177,6 +193,7 @@ def main():
         weekly=args.weekly,
         monthly=args.monthly,
         radio=args.radio,
+        web=args.web,
     )
     sys.exit(exit_code)
 

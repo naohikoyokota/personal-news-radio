@@ -143,6 +143,40 @@ personal-news-radio/
 🔗 [元記事URL]
 ```
 
+## GitHub Pages の設定
+
+毎朝のデイリー配信と同時に `docs/` フォルダへ HTML を生成し、GitHub Pages で公開できます。
+
+### 初回設定手順
+
+1. **GitHub リポジトリの Settings を開く**
+   - `Settings` → `Pages`
+
+2. **Source を設定**
+   - Branch: `main`
+   - Folder: `/docs`
+   - 「Save」をクリック
+
+3. **公開 URL の確認**
+   - 数分後に `https://<ユーザー名>.github.io/<リポジトリ名>/` で公開される
+
+### ローカルで HTML を手動生成する
+
+```bash
+python main.py --web
+# → docs/index.html と docs/YYYY-MM-DD.html が生成される
+```
+
+### 生成される HTML の内容
+
+| ファイル | 説明 |
+|---------|------|
+| `docs/index.html` | 最新日付のページ（常に上書き） |
+| `docs/YYYY-MM-DD.html` | 日付別アーカイブ（過去7日分にリンク） |
+| `docs/.nojekyll` | Jekyll 無効化ファイル（自動生成） |
+
+---
+
 ## トラブルシューティング
 
 **記事が収集されない**

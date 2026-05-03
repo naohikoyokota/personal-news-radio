@@ -22,6 +22,8 @@ jobs:
   daily:
     name: デイリー配信 (毎日 7:00 JST)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: |
       github.event.schedule == '0 22 * * *' ||
       github.event_name == 'workflow_dispatch'
@@ -39,14 +41,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run daily news
+      - name: Run daily news + generate web
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-        run: python main.py
+        run: python main.py --web
+
+      - name: Deploy GitHub Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          git diff --staged --quiet && echo "変更なし、スキップ" || \
+            git commit -m "📰 ニュース更新 $(TZ=Asia/Tokyo date +%Y-%m-%d)" && git push
 
 # ──────────────────────────────────────────────────────────────
 # 週次まとめ  毎週日曜 JST 8:00
