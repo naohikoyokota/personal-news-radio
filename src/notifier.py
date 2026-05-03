@@ -7,6 +7,7 @@ from .logger import logger
 
 LINE_API_URL = "https://api.line.me/v2/bot/message/push"
 MAX_LINE_MESSAGE_LENGTH = 5000
+GITHUB_PAGES_URL = "https://naohikoyokota.github.io/personal-news-radio/"
 
 
 def send_line_message(text: str, dry_run: bool = False) -> bool:

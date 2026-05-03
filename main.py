@@ -16,7 +16,7 @@ from src.database import init_db, get_undelivered_articles, mark_as_delivered
 from src.collector import collect_all_feeds
 from src.summarizer import generate_category_digest
 from src.formatter import format_summary_message, format_detail_messages
-from src.notifier import send_line_message, send_line_audio_message, send_line_radio_link, send_error_notification
+from src.notifier import send_line_message, send_line_audio_message, send_line_radio_link, send_error_notification, GITHUB_PAGES_URL
 from src.radio_script import generate_radio_script
 from src.tts import generate_audio, upload_to_file_io
 from src.web_generator import generate_html_pages
@@ -85,6 +85,7 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
 
     # Step 5: メッセージ整形
     summary_msg = format_summary_message(digest)
+    summary_msg += f"\n\n🌐 ページが更新されました:\n{GITHUB_PAGES_URL}"
     detail_msgs = format_detail_messages(digest)
     all_messages = [summary_msg] + detail_msgs
 
