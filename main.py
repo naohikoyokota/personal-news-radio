@@ -137,6 +137,9 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
         try:
             html_files = generate_html_pages(digest)
             logger.info(f"HTML生成完了: {[str(f) for f in html_files]}")
+            # GitHub PagesのURLをLINEに通知
+            web_msg = f"🌐 本日のニュースページが更新されました\n{GITHUB_PAGES_URL}"
+            send_line_message(web_msg, dry_run=dry_run)
         except Exception as e:
             logger.error(f"HTML generation failed: {e}")
             # HTML生成失敗はLINE配信結果に影響させない
