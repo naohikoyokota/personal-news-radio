@@ -28,8 +28,10 @@ categories:
     feeds:
       - name: "ITmedia NEWS"
         url: "https://rss.itmedia.co.jp/rss/2.0/itmedia_news.xml"
-      - name: "TechCrunch Japan"
-        url: "https://jp.techcrunch.com/feed/"
+      - name: "Zenn AI"
+        url: "https://zenn.dev/topics/ai/feed"
+      - name: "ASCII AI"
+        url: "https://ascii.jp/rss.xml"
 
   - id: entertainment
     label: "🎭 国内エンタメ"
@@ -44,8 +46,6 @@ categories:
     feeds:
       - name: "NHKスポーツ"
         url: "https://www3.nhk.or.jp/rss/news/cat7.xml"
-      - name: "スポーツナビ"
-        url: "https://sports.yahoo.co.jp/rss/topfeed.rss"
 
   - id: general
     label: "📰 国内一般ニュース"
@@ -67,8 +67,8 @@ categories:
     feeds:
       - name: "BBC Japan"
         url: "https://feeds.bbci.co.uk/japanese/rss.xml"
-      - name: "Reuters日本語"
-        url: "https://jp.reuters.com/rssFeed/topNews"
+      - name: "BBC World"
+        url: "https://feeds.bbci.co.uk/news/world/rss.xml"
 
 # 各フィードから取得する最大記事数
 max_articles_per_feed: 5
