@@ -1,8 +1,8 @@
 import base64
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import httpx
 
@@ -83,7 +83,7 @@ def _synthesize_chunk(
 
 def generate_audio(
     script: str,
-    output_dir: str = "~/news-radio",
+    output_dir: str = "docs/audio",
     voice: str = TTS_DEFAULT_VOICE,
     speaking_rate: float = 1.0,
 ) -> List[Path]:
@@ -91,7 +91,7 @@ def generate_audio(
 
     Args:
         script:        読み上げるテキスト原稿
-        output_dir:    保存先ディレクトリ（デフォルト: ~/news-radio）
+        output_dir:    保存先ディレクトリ（デフォルト: docs/audio）
         voice:         音声名（デフォルト: ja-JP-Neural2-B）
         speaking_rate: 再生速度（0.25〜4.0、デフォルト: 1.0）
 
@@ -137,40 +137,26 @@ def generate_audio(
     return saved
 
 
-def upload_to_file_io(file_path: Path) -> Optional[str]:
-    """MP3ファイルを0x0.stにアップロードし、公開URLを返す（最大90日間有効、複数回アクセス可）。
+def cleanup_old_audio(days: int = 7) -> None:
+    """docs/audio/ 内のMP3ファイルを直近 days 日分だけ残して削除する。
 
     Args:
-        file_path: アップロードするMP3ファイルのパス
-
-    Returns:
-        アップロード成功時は公開URL、失敗時はNone
+        days: 保持する日数（デフォルト: 7）
     """
-    import requests
+    audio_dir = Path("docs/audio")
+    if not audio_dir.exists():
+        return
 
-    logger.info(f"Uploading {file_path.name} to 0x0.st...")
-    try:
-        with open(file_path, "rb") as f:
-            resp = requests.post(
-                "https://0x0.st",
-                files={"file": f},
-                timeout=120,
-            )
-        if resp.status_code == 200:
-            public_url = resp.text.strip()
-            if public_url.startswith("http"):
-                logger.info(f"Upload successful: {public_url}")
-                return public_url
-            else:
-                logger.error(f"0x0.st unexpected response: {resp.text[:200]}")
-                return None
-        else:
-            logger.error(f"0x0.st error {resp.status_code}: {resp.text[:200]}")
-            return None
-    except Exception as e:
-        logger.error(f"0x0.st upload failed: {e}")
-        return None
+    cutoff = datetime.now() - timedelta(days=days)
+    removed = 0
+    for mp3 in audio_dir.glob("*.mp3"):
+        mtime = datetime.fromtimestamp(mp3.stat().st_mtime)
+        if mtime < cutoff:
+            mp3.unlink()
+            logger.info(f"古いMP3を削除: {mp3.name} (更新日時: {mtime:%Y-%m-%d})")
+            removed += 1
 
-
-# 後方互換エイリアス
-upload_to_transfer_sh = upload_to_file_io
+    if removed:
+        logger.info(f"cleanup_old_audio: {removed} ファイルを削除しました")
+    else:
+        logger.info(f"cleanup_old_audio: 削除対象なし（直近{days}日以内のファイルのみ）")

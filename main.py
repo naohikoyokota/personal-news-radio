@@ -18,7 +18,7 @@ from src.summarizer import generate_category_digest
 from src.formatter import format_summary_message, format_detail_messages
 from src.notifier import send_line_message, send_line_audio_message, send_line_radio_link, send_error_notification, GITHUB_PAGES_URL
 from src.radio_script import generate_radio_script
-from src.tts import generate_audio, upload_to_file_io
+from src.tts import generate_audio, cleanup_old_audio
 from src.web_generator import generate_html_pages
 
 
@@ -118,14 +118,15 @@ def run(dry_run: bool = False, config_path: str = "config.yaml",
             if script:
                 audio_files = generate_audio(script, voice=tts_voice, speaking_rate=tts_speaking_rate)
                 logger.info(f"ラジオ音声生成完了: {[str(f) for f in audio_files]}")
+                cleanup_old_audio(days=7)
                 # 再生時間を推定（日本語TTS: 約380文字/分 × speaking_rate）
                 duration_minutes = max(1, round(len(script) / (380 * tts_speaking_rate)))
                 for audio_file in audio_files:
-                    audio_url = upload_to_file_io(audio_file)
-                    if audio_url:
-                        send_line_radio_link(audio_url, duration_minutes, dry_run=dry_run)
-                    else:
-                        logger.warning(f"transfer.shへのアップロード失敗のため音声リンク送信をスキップ: {audio_file}")
+                    audio_url = (
+                        f"https://naohikoyokota.github.io/personal-news-radio"
+                        f"/audio/{audio_file.name}"
+                    )
+                    send_line_radio_link(audio_url, duration_minutes, dry_run=dry_run)
             else:
                 logger.warning("ラジオスクリプトが空のため音声生成をスキップ")
         except Exception as e:
