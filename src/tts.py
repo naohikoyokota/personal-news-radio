@@ -138,7 +138,7 @@ def generate_audio(
 
 
 def upload_to_file_io(file_path: Path) -> Optional[str]:
-    """MP3ファイルをfile.ioにアップロードし、公開URLを返す（14日間有効）。
+    """MP3ファイルを0x0.stにアップロードし、公開URLを返す（最大90日間有効、複数回アクセス可）。
 
     Args:
         file_path: アップロードするMP3ファイルのパス
@@ -148,28 +148,27 @@ def upload_to_file_io(file_path: Path) -> Optional[str]:
     """
     import requests
 
-    logger.info(f"Uploading {file_path.name} to file.io...")
+    logger.info(f"Uploading {file_path.name} to 0x0.st...")
     try:
         with open(file_path, "rb") as f:
             resp = requests.post(
-                "https://file.io",
+                "https://0x0.st",
                 files={"file": f},
-                data={"expires": "14d"},
                 timeout=120,
             )
         if resp.status_code == 200:
-            public_url = resp.json().get("link")
-            if public_url:
+            public_url = resp.text.strip()
+            if public_url.startswith("http"):
                 logger.info(f"Upload successful: {public_url}")
                 return public_url
             else:
-                logger.error(f"file.io response missing 'link': {resp.text[:200]}")
+                logger.error(f"0x0.st unexpected response: {resp.text[:200]}")
                 return None
         else:
-            logger.error(f"file.io error {resp.status_code}: {resp.text[:200]}")
+            logger.error(f"0x0.st error {resp.status_code}: {resp.text[:200]}")
             return None
     except Exception as e:
-        logger.error(f"file.io upload failed: {e}")
+        logger.error(f"0x0.st upload failed: {e}")
         return None
 
 
